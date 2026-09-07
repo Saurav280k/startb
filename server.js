@@ -36,7 +36,7 @@ app.get('/api/health', (req, res) => {
     status: 'online',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    service: 'Apex Digital Marketplace & Internship Portal API',
+    service: 'Modern Teams Marketplace & Internship Portal API',
   });
 });
 
@@ -53,5 +53,5 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Apex Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  console.log(`🚀 Modern Teams Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });

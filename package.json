@@ -1,7 +1,7 @@
 {
-  "name": "apex-market-server",
+  "name": "modern-teams-server",
   "version": "1.0.0",
-  "description": "Backend API for Apex Marketplace & Internship Portal",
+  "description": "Backend API for Modern Teams Marketplace & Internship Portal",
   "main": "server.js",
   "type": "module",
   "scripts": {
