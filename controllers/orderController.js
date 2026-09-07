@@ -264,8 +264,10 @@ export const verifyPayment = async (req, res) => {
     if (status === 'Approved & Verified') {
       order.verificationStatus = 'Approved & Verified';
       order.paymentStatus = 'completed';
-      order.transferStatus = 'Credentials Sent to Email';
-      order.transferEta = 'Transferred';
+      if (!order.transferStatus || order.transferStatus === 'Verification in Progress') {
+        order.transferStatus = 'Verification in Progress';
+      }
+      order.transferEta = 'Within 1 - 2 Hours';
     } else if (status === 'Rejected') {
       order.verificationStatus = 'Rejected';
       order.paymentStatus = 'failed';

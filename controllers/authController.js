@@ -163,4 +163,83 @@ export const updateProfile = async (req, res) => {
   }
 };
 
+// @desc    Authenticate or register user via Google OAuth (ID token)
+// @route   POST /api/auth/google
+export const googleAuth = async (req, res) => {
+  try {
+    const { credential, clientId } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google credential token is required' });
+    }
+
+    // Verify token using Google's tokeninfo endpoint
+    let payload;
+    try {
+      const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+      if (!googleRes.ok) {
+        return res.status(401).json({ success: false, message: 'Invalid or expired Google authentication token' });
+      }
+      payload = await googleRes.json();
+    } catch (fetchErr) {
+      return res.status(500).json({ success: false, message: 'Failed to verify token with Google servers: ' + fetchErr.message });
+    }
+
+    const { sub: googleId, email, name, picture, email_verified } = payload;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Google account does not provide an email address' });
+    }
+
+    // Find existing user by googleId or email
+    let user = await User.findOne({
+      $or: [{ googleId }, { email: email.toLowerCase().trim() }],
+    });
+
+    if (user) {
+      // If user exists, link Google ID and update avatar if missing
+      if (!user.googleId) user.googleId = googleId;
+      if (picture && !user.avatar) user.avatar = picture;
+      await user.save();
+    } else {
+      // Create new user
+      const baseUsername = (name || email.split('@')[0])
+        .replace(/[^a-zA-Z0-9_]/g, '_')
+        .toLowerCase()
+        .slice(0, 20);
+
+      let finalUsername = baseUsername.length >= 3 ? baseUsername : `user_${baseUsername}`;
+      const existingUser = await User.findOne({ username: finalUsername });
+      if (existingUser) {
+        finalUsername = `${finalUsername}_${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+
+      user = await User.create({
+        username: finalUsername,
+        email: email.toLowerCase().trim(),
+        googleId,
+        avatar: picture || '',
+        password: '',
+        role: 'user',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Signed in successfully as ${user.username}!`,
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        phone: user.phone || '',
+        avatar: user.avatar || '',
+        role: user.role,
+      },
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
