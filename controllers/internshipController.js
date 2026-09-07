@@ -103,3 +103,142 @@ export const applyForInternship = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Create a new internship position (Admin only)
+// @route   POST /api/internships
+export const createInternship = async (req, res) => {
+  try {
+    const { title, domain, stipend, duration, location, openings, summary, requirements, responsibilities, perks, skills } = req.body;
+
+    if (!title || !domain || !stipend) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide internship title, domain, and stipend',
+      });
+    }
+
+    const internship = await Internship.create({
+      title: title.trim(),
+      domain: domain.trim(),
+      stipend: stipend.trim(),
+      duration: duration || '3 Months',
+      location: location || 'Work From Home (Remote)',
+      openings: Number(openings) || 2,
+      summary: summary || `${title} internship with hands-on mentor support.`,
+      requirements: requirements || ['Basic knowledge of domain stack', 'Enthusiastic to learn'],
+      responsibilities: responsibilities || ['Build production components', 'Participate in sprint standups'],
+      perks: perks || ['Certificate of completion', 'Letter of recommendation', 'PPO opportunity'],
+      skills: skills || ['Communication', 'Teamwork', domain],
+      status: 'active',
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Internship position created successfully!',
+      internship,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update an internship position (Admin only)
+// @route   PUT /api/internships/:id
+export const updateInternship = async (req, res) => {
+  try {
+    const internship = await Internship.findById(req.params.id);
+    if (!internship) {
+      return res.status(404).json({ success: false, message: 'Internship position not found' });
+    }
+
+    const updated = await Internship.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Internship updated successfully!',
+      internship: updated,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete an internship position (Admin only)
+// @route   DELETE /api/internships/:id
+export const deleteInternship = async (req, res) => {
+  try {
+    const internship = await Internship.findById(req.params.id);
+    if (!internship) {
+      return res.status(404).json({ success: false, message: 'Internship position not found' });
+    }
+
+    await Internship.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Internship position deleted successfully!',
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get all internship applications (Admin only)
+// @route   GET /api/internships/admin/applications
+export const getAllApplications = async (req, res) => {
+  try {
+    const { status, domain } = req.query;
+    let query = {};
+
+    if (status && status !== 'All') {
+      query.status = status;
+    }
+    if (domain && domain !== 'All') {
+      query.domain = domain;
+    }
+
+    const applications = await Application.find(query)
+      .populate('internship')
+      .sort({ submittedAt: -1 });
+
+    res.json({
+      success: true,
+      count: applications.length,
+      applications,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update an application status (Admin only)
+// @route   PUT /api/internships/admin/applications/:id
+export const updateApplicationStatus = async (req, res) => {
+  try {
+    const { status } = req.body; // ['Pending', 'Reviewing', 'Shortlisted', 'Accepted', 'Rejected']
+
+    const application = await Application.findById(req.params.id);
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    if (status) {
+      application.status = status;
+    }
+
+    await application.save();
+
+    res.json({
+      success: true,
+      message: `Application for ${application.applicantName} marked as ${application.status}!`,
+      application,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

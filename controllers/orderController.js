@@ -205,3 +205,163 @@ export const getMyOrders = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Get all orders (Admin only)
+// @route   GET /api/orders
+export const getAllOrders = async (req, res) => {
+  try {
+    const { status, search } = req.query;
+    let query = {};
+
+    if (status && status !== 'All') {
+      if (status === 'Pending') {
+        query.verificationStatus = 'Pending Admin Approval';
+      } else if (status === 'Approved') {
+        query.verificationStatus = 'Approved & Verified';
+      } else if (status === 'Rejected') {
+        query.verificationStatus = 'Rejected';
+      } else {
+        query.verificationStatus = status;
+      }
+    }
+
+    if (search) {
+      query.$or = [
+        { orderNumber: { $regex: search, $options: 'i' } },
+        { buyerEmail: { $regex: search, $options: 'i' } },
+        { buyerPhone: { $regex: search, $options: 'i' } },
+        { transferDestinationEmail: { $regex: search, $options: 'i' } },
+        { upiTransactionId: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const orders = await Order.find(query)
+      .populate('accountItem')
+      .populate('serviceItem')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: orders.length,
+      orders,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Approve or reject payment (Admin only)
+// @route   PUT /api/orders/:id/verify
+export const verifyPayment = async (req, res) => {
+  try {
+    const { status, notes } = req.body; // status: 'Approved & Verified' | 'Rejected'
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (status === 'Approved & Verified') {
+      order.verificationStatus = 'Approved & Verified';
+      order.paymentStatus = 'completed';
+      order.transferStatus = 'Credentials Sent to Email';
+      order.transferEta = 'Transferred';
+    } else if (status === 'Rejected') {
+      order.verificationStatus = 'Rejected';
+      order.paymentStatus = 'failed';
+      order.transferStatus = 'Verification in Progress';
+      // If account was reserved, revert it to available
+      if (order.accountItem) {
+        await Account.findByIdAndUpdate(order.accountItem, { status: 'available' });
+      }
+    }
+
+    if (notes) {
+      order.notes = notes;
+    }
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: `Order #${order.orderNumber} payment marked as ${order.verificationStatus}!`,
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update credential transfer status (Admin only)
+// @route   PUT /api/orders/:id/transfer
+export const updateTransferStatus = async (req, res) => {
+  try {
+    const { transferStatus, transferNotes } = req.body;
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (transferStatus) {
+      order.transferStatus = transferStatus;
+    }
+    if (transferNotes) {
+      order.notes = transferNotes;
+    }
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: `Order #${order.orderNumber} transfer status updated to "${order.transferStatus}"`,
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get Admin Overview KPIs & Stats (Admin only)
+// @route   GET /api/orders/admin/stats
+export const getAdminStats = async (req, res) => {
+  try {
+    const totalOrders = await Order.countDocuments();
+    const pendingOrders = await Order.countDocuments({
+      verificationStatus: 'Pending Admin Approval',
+    });
+    const approvedOrders = await Order.countDocuments({
+      verificationStatus: 'Approved & Verified',
+    });
+    const rejectedOrders = await Order.countDocuments({
+      verificationStatus: 'Rejected',
+    });
+
+    const revenueData = await Order.aggregate([
+      { $match: { verificationStatus: 'Approved & Verified' } },
+      { $group: { _id: null, totalRevenue: { $sum: '$amount' } } },
+    ]);
+    const totalRevenue = revenueData[0]?.totalRevenue || 0;
+
+    const totalAccounts = await Account.countDocuments();
+    const availableAccounts = await Account.countDocuments({ status: 'available' });
+    const soldAccounts = await Account.countDocuments({ status: 'sold' });
+
+    res.json({
+      success: true,
+      stats: {
+        totalRevenue,
+        totalOrders,
+        pendingOrders,
+        approvedOrders,
+        rejectedOrders,
+        totalAccounts,
+        availableAccounts,
+        soldAccounts,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

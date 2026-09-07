@@ -89,3 +89,123 @@ export const getFeaturedAccounts = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Create a new account product (Admin only)
+// @route   POST /api/accounts
+export const createAccount = async (req, res) => {
+  try {
+    const {
+      title,
+      platform,
+      handle,
+      followersCount,
+      engagementRate,
+      niche,
+      price,
+      originalPrice,
+      verifiedBadge = false,
+      monetizationEnabled = false,
+      monthlyRevenue = 0,
+      accountAgeYears = 1,
+      audienceStats = {},
+      screenshots = [],
+      description,
+      highlights = [],
+      transferTimeHours = 1,
+    } = req.body;
+
+    if (!title || !platform || !handle || !price) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide title, platform, handle, and price',
+      });
+    }
+
+    const defaultScreenshots = screenshots.length > 0 ? screenshots : [
+      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+    ];
+
+    const account = await Account.create({
+      title: title.trim(),
+      platform: platform.trim(),
+      handle: handle.trim().startsWith('@') ? handle.trim() : `@${handle.trim()}`,
+      followersCount: Number(followersCount) || 10000,
+      engagementRate: Number(engagementRate) || 5.0,
+      niche: niche ? niche.trim() : 'Creator & Lifestyle',
+      price: Number(price),
+      originalPrice: Number(originalPrice) || Number(price) * 1.25,
+      verifiedBadge: Boolean(verifiedBadge),
+      monetizationEnabled: Boolean(monetizationEnabled),
+      monthlyRevenue: Number(monthlyRevenue) || 0,
+      accountAgeYears: Number(accountAgeYears) || 1,
+      audienceStats: {
+        topCountries: audienceStats.topCountries || ['India (50%)', 'United States (30%)'],
+        genderDistribution: audienceStats.genderDistribution || '60% Male / 40% Female',
+        primaryAgeGroup: audienceStats.primaryAgeGroup || '18-34 years (85%)',
+      },
+      screenshots: defaultScreenshots,
+      description: description ? description.trim() : `${title} verified asset ready for immediate handoff.`,
+      highlights: highlights.length > 0 ? highlights : [
+        'Full credential ownership handoff',
+        'Original recovery email included',
+        'Verified clean account with no active strikes',
+      ],
+      status: 'available',
+      transferTimeHours: Number(transferTimeHours) || 1,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'New account listing created successfully!',
+      account,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update an account product (Admin only)
+// @route   PUT /api/accounts/:id
+export const updateAccount = async (req, res) => {
+  try {
+    const account = await Account.findById(req.params.id);
+    if (!account) {
+      return res.status(404).json({ success: false, message: 'Account not found' });
+    }
+
+    const updatedAccount = await Account.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Account updated successfully!',
+      account: updatedAccount,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete an account product (Admin only)
+// @route   DELETE /api/accounts/:id
+export const deleteAccount = async (req, res) => {
+  try {
+    const account = await Account.findById(req.params.id);
+    if (!account) {
+      return res.status(404).json({ success: false, message: 'Account not found' });
+    }
+
+    await Account.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Account listing deleted successfully!',
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
