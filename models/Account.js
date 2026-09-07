@@ -16,6 +16,11 @@ const accountSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  profileUrl: {
+    type: String,
+    default: '',
+    trim: true,
+  },
   followersCount: {
     type: Number,
     required: true,

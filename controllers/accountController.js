@@ -98,6 +98,7 @@ export const createAccount = async (req, res) => {
       title,
       platform,
       handle,
+      profileUrl = '',
       followersCount,
       engagementRate,
       niche,
@@ -125,10 +126,22 @@ export const createAccount = async (req, res) => {
       'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
     ];
 
+    const cleanHandle = handle.trim().replace(/^@/, '');
+    let finalProfileUrl = profileUrl ? profileUrl.trim() : '';
+    if (!finalProfileUrl) {
+      if (platform === 'Instagram') finalProfileUrl = `https://instagram.com/${cleanHandle}`;
+      else if (platform === 'YouTube') finalProfileUrl = `https://youtube.com/@${cleanHandle}`;
+      else if (platform === 'TikTok') finalProfileUrl = `https://tiktok.com/@${cleanHandle}`;
+      else if (platform === 'X/Twitter') finalProfileUrl = `https://x.com/${cleanHandle}`;
+      else if (platform === 'Telegram') finalProfileUrl = `https://t.me/${cleanHandle}`;
+      else finalProfileUrl = `https://${cleanHandle}`;
+    }
+
     const account = await Account.create({
       title: title.trim(),
       platform: platform.trim(),
       handle: handle.trim().startsWith('@') ? handle.trim() : `@${handle.trim()}`,
+      profileUrl: finalProfileUrl,
       followersCount: Number(followersCount) || 10000,
       engagementRate: Number(engagementRate) || 5.0,
       niche: niche ? niche.trim() : 'Creator & Lifestyle',
