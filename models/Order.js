@@ -78,7 +78,7 @@ const orderSchema = new mongoose.Schema({
   },
   paymentStatus: {
     type: String,
-    enum: ['pending_verification', 'completed', 'failed'],
+    enum: ['pending_verification', 'completed', 'failed', 'refunded'],
     default: 'pending_verification',
   },
   verificationStatus: {
@@ -92,9 +92,41 @@ const orderSchema = new mongoose.Schema({
   },
   transferStatus: {
     type: String,
-    enum: ['Verification in Progress', 'Credentials Sent to Email', 'Transfer Complete'],
     default: 'Verification in Progress',
   },
+  transferStage: {
+    type: String,
+    enum: ['payment_submitted', 'payment_verified', 'security_cleared', 'credentials_dispatched', 'completed', 'refund_requested', 'refunded', 'rejected'],
+    default: 'payment_submitted',
+  },
+  transferCredentials: {
+    loginUsername: { type: String, default: '' },
+    password: { type: String, default: '' },
+    originalEmail: { type: String, default: '' },
+    securityNotes: { type: String, default: '' },
+    dispatchedAt: { type: Date, default: null },
+  },
+  refund: {
+    status: {
+      type: String,
+      enum: ['none', 'requested', 'approved', 'rejected'],
+      default: 'none',
+    },
+    reason: { type: String, default: '' },
+    upiId: { type: String, default: '' },
+    buyerNotes: { type: String, default: '' },
+    adminNotes: { type: String, default: '' },
+    requestedAt: { type: Date, default: null },
+    processedAt: { type: Date, default: null },
+  },
+  transferTimeline: [
+    {
+      stage: { type: String, required: true },
+      title: { type: String, required: true },
+      description: { type: String, required: true },
+      timestamp: { type: Date, default: Date.now },
+    },
+  ],
   transferEta: {
     type: String,
     default: 'Within 1 - 2 Hours',

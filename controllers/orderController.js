@@ -154,6 +154,15 @@ export const createOrder = async (req, res) => {
       verificationStatus: 'Pending Admin Approval',
       safetyStatus: '100% Safe Buyer Guarantee',
       transferStatus: 'Verification in Progress',
+      transferStage: 'payment_submitted',
+      transferTimeline: [
+        {
+          stage: 'payment_submitted',
+          title: 'Payment Submitted',
+          description: `UPI Transaction ID ${upiTransactionId.trim()} submitted for verification.`,
+          timestamp: new Date(),
+        },
+      ],
       transferEta: 'Within 1 - 2 Hours',
       notes,
     });
@@ -220,6 +229,8 @@ export const getAllOrders = async (req, res) => {
         query.verificationStatus = 'Approved & Verified';
       } else if (status === 'Rejected') {
         query.verificationStatus = 'Rejected';
+      } else if (status === 'Refunds') {
+        query['refund.status'] = { $in: ['requested', 'approved', 'rejected'] };
       } else {
         query.verificationStatus = status;
       }
@@ -264,14 +275,30 @@ export const verifyPayment = async (req, res) => {
     if (status === 'Approved & Verified') {
       order.verificationStatus = 'Approved & Verified';
       order.paymentStatus = 'completed';
+      order.transferStage = 'payment_verified';
       if (!order.transferStatus || order.transferStatus === 'Verification in Progress') {
         order.transferStatus = 'Verification in Progress';
       }
       order.transferEta = 'Within 1 - 2 Hours';
+      if (!order.transferTimeline) order.transferTimeline = [];
+      order.transferTimeline.push({
+        stage: 'payment_verified',
+        title: 'Payment Verified & Escrow Locked',
+        description: 'UPI UTR transaction verified with bank. Funds are secured in Modern Teams escrow protection.',
+        timestamp: new Date(),
+      });
     } else if (status === 'Rejected') {
       order.verificationStatus = 'Rejected';
       order.paymentStatus = 'failed';
+      order.transferStage = 'rejected';
       order.transferStatus = 'Verification in Progress';
+      if (!order.transferTimeline) order.transferTimeline = [];
+      order.transferTimeline.push({
+        stage: 'rejected',
+        title: 'Payment Verification Failed',
+        description: notes || 'UPI UTR transaction could not be verified with bank records. Please contact support via WhatsApp.',
+        timestamp: new Date(),
+      });
       // If account was reserved, revert it to available
       if (order.accountItem) {
         await Account.findByIdAndUpdate(order.accountItem, { status: 'available' });
@@ -294,7 +321,80 @@ export const verifyPayment = async (req, res) => {
   }
 };
 
-// @desc    Update credential transfer status (Admin only)
+// @desc    Dispatch credentials to buyer (Admin only)
+// @route   PUT /api/orders/:id/dispatch-credentials
+export const dispatchCredentials = async (req, res) => {
+  try {
+    const { loginUsername, password, originalEmail, securityNotes } = req.body;
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    order.transferCredentials = {
+      loginUsername: loginUsername || '',
+      password: password || '',
+      originalEmail: originalEmail || '',
+      securityNotes: securityNotes || '',
+      dispatchedAt: new Date(),
+    };
+    order.transferStatus = 'Credentials Sent to Email';
+    order.transferStage = 'credentials_dispatched';
+
+    if (!order.transferTimeline) order.transferTimeline = [];
+    order.transferTimeline.push({
+      stage: 'credentials_dispatched',
+      title: 'Credentials Dispatched to Vault',
+      description: `Account credentials successfully prepared and dispatched to ${order.transferDestinationEmail}. Details also unlocked in your Secure Credentials Vault below.`,
+      timestamp: new Date(),
+    });
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: `Credentials dispatched to ${order.transferDestinationEmail} for Order #${order.orderNumber}`,
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Complete entire transfer handoff (Admin only)
+// @route   PUT /api/orders/:id/complete-handoff
+export const completeHandoff = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    order.transferStatus = 'Transfer Complete';
+    order.transferStage = 'completed';
+
+    if (!order.transferTimeline) order.transferTimeline = [];
+    order.transferTimeline.push({
+      stage: 'completed',
+      title: 'Ownership Handoff Complete',
+      description: 'Account login confirmed, recovery credentials verified, and 100% full ownership is transferred.',
+      timestamp: new Date(),
+    });
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: `Order #${order.orderNumber} handoff marked complete!`,
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update credential transfer status (Admin only legacy endpoint)
 // @route   PUT /api/orders/:id/transfer
 export const updateTransferStatus = async (req, res) => {
   try {
@@ -317,6 +417,108 @@ export const updateTransferStatus = async (req, res) => {
     res.json({
       success: true,
       message: `Order #${order.orderNumber} transfer status updated to "${order.transferStatus}"`,
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Request refund for an order (Buyer)
+// @route   POST /api/orders/:id/refund
+export const requestRefund = async (req, res) => {
+  try {
+    const { reason, upiId, buyerNotes } = req.body;
+
+    if (!reason || !upiId) {
+      return res.status(400).json({ success: false, message: 'Reason and receiving UPI ID are required for refund request' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    order.refund = {
+      status: 'requested',
+      reason: reason.trim(),
+      upiId: upiId.trim(),
+      buyerNotes: (buyerNotes || '').trim(),
+      requestedAt: new Date(),
+    };
+    order.transferStage = 'refund_requested';
+
+    if (!order.transferTimeline) order.transferTimeline = [];
+    order.transferTimeline.push({
+      stage: 'refund_requested',
+      title: 'Refund Requested by Buyer',
+      description: `Refund claim submitted: "${reason}". Receiving UPI ID: ${upiId}. Modern Teams support is reviewing the claim.`,
+      timestamp: new Date(),
+    });
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Refund request submitted successfully. Our team will review and process your refund within 2-4 hours.',
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Approve or reject refund (Admin only)
+// @route   PUT /api/orders/:id/refund-status
+export const updateRefundStatus = async (req, res) => {
+  try {
+    const { status, adminNotes } = req.body; // 'approved' | 'rejected'
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (!order.refund) {
+      order.refund = { status: 'none' };
+    }
+
+    order.refund.status = status;
+    order.refund.adminNotes = adminNotes || '';
+    order.refund.processedAt = new Date();
+
+    if (!order.transferTimeline) order.transferTimeline = [];
+
+    if (status === 'approved') {
+      order.paymentStatus = 'refunded';
+      order.transferStatus = 'Refunded';
+      order.transferStage = 'refunded';
+      order.transferTimeline.push({
+        stage: 'refund_approved',
+        title: 'Refund Approved & Processed',
+        description: `Refund of ₹${order.amount} approved and transferred back to UPI ID ${order.refund.upiId}. ${adminNotes || ''}`,
+        timestamp: new Date(),
+      });
+
+      // Restore account if it was an account item
+      if (order.accountItem) {
+        await Account.findByIdAndUpdate(order.accountItem, { status: 'available' });
+      }
+    } else if (status === 'rejected') {
+      order.transferStage = 'payment_verified';
+      order.transferTimeline.push({
+        stage: 'refund_rejected',
+        title: 'Refund Request Declined',
+        description: adminNotes || 'Refund request was declined after administrative review.',
+        timestamp: new Date(),
+      });
+    }
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: `Refund marked as ${status} for Order #${order.orderNumber}!`,
       order,
     });
   } catch (error) {
