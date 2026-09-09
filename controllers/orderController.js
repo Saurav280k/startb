@@ -283,8 +283,8 @@ export const verifyPayment = async (req, res) => {
       if (!order.transferTimeline) order.transferTimeline = [];
       order.transferTimeline.push({
         stage: 'payment_verified',
-        title: 'Payment Verified & Escrow Locked',
-        description: 'UPI UTR transaction verified with bank. Funds are secured in Modern Teams escrow protection.',
+        title: 'Payment Verified & Secured',
+        description: 'UPI UTR transaction verified with bank. Funds are secured with Modern Teams buyer protection.',
         timestamp: new Date(),
       });
     } else if (status === 'Rejected') {
