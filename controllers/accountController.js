@@ -20,6 +20,10 @@ export const getAccounts = async (req, res) => {
       query.verifiedBadge = true;
     }
 
+    if (req.query.featuredOnHome !== undefined) {
+      query.featuredOnHome = req.query.featuredOnHome === 'true';
+    }
+
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = Number(minPrice);
@@ -113,6 +117,7 @@ export const createAccount = async (req, res) => {
       description,
       highlights = [],
       transferTimeHours = 1,
+      featuredOnHome = false,
     } = req.body;
 
     if (!title || !platform || !handle || !price) {
@@ -120,6 +125,11 @@ export const createAccount = async (req, res) => {
         success: false,
         message: 'Please provide title, platform, handle, and price',
       });
+    }
+
+    if (Boolean(featuredOnHome)) {
+      // Unset previous featured on home accounts so only 1 is active on homepage
+      await Account.updateMany({ featuredOnHome: true }, { $set: { featuredOnHome: false } });
     }
 
     const defaultScreenshots = screenshots.length > 0 ? screenshots : [
@@ -165,6 +175,7 @@ export const createAccount = async (req, res) => {
       ],
       status: 'available',
       transferTimeHours: Number(transferTimeHours) || 1,
+      featuredOnHome: Boolean(featuredOnHome),
     });
 
     res.status(201).json({
@@ -184,6 +195,13 @@ export const updateAccount = async (req, res) => {
     const account = await Account.findById(req.params.id);
     if (!account) {
       return res.status(404).json({ success: false, message: 'Account not found' });
+    }
+
+    if (Boolean(req.body.featuredOnHome)) {
+      await Account.updateMany(
+        { _id: { $ne: req.params.id }, featuredOnHome: true },
+        { $set: { featuredOnHome: false } }
+      );
     }
 
     const updatedAccount = await Account.findByIdAndUpdate(

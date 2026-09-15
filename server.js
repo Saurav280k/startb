@@ -10,6 +10,7 @@ import accountRoutes from './routes/accountRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
 import internshipRoutes from './routes/internshipRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
+import settingRoutes from './routes/settingRoutes.js';
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ app.use('/api/accounts', accountRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/internships', internshipRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/settings', settingRoutes);
 
 // Error Middlewares
 app.use(notFound);

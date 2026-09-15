@@ -1,6 +1,7 @@
 import Order from '../models/Order.js';
 import Account from '../models/Account.js';
 import Service from '../models/Service.js';
+import Setting from '../models/Setting.js';
 
 // Helper to generate readable reference IDs
 const generateId = (prefix) => {
@@ -16,6 +17,15 @@ const generateId = (prefix) => {
 // @route   POST /api/orders
 export const createOrder = async (req, res) => {
   try {
+    // Check if marketplace payments are globally enabled
+    const paymentSetting = await Setting.findOne({ key: 'payments_enabled' });
+    if (paymentSetting && paymentSetting.value === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Online checkout and payments are temporarily paused for maintenance. Please check back shortly.',
+      });
+    }
+
     const {
       buyerEmail,
       buyerPhone,
@@ -428,7 +438,7 @@ export const updateTransferStatus = async (req, res) => {
 // @route   POST /api/orders/:id/refund
 export const requestRefund = async (req, res) => {
   try {
-    const { reason, upiId, buyerNotes } = req.body;
+    const { reason, upiId, buyerNotes, notes } = req.body;
 
     if (!reason || !upiId) {
       return res.status(400).json({ success: false, message: 'Reason and receiving UPI ID are required for refund request' });
@@ -439,11 +449,13 @@ export const requestRefund = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    const cleanNotes = (buyerNotes || notes || '').trim();
+
     order.refund = {
       status: 'requested',
       reason: reason.trim(),
       upiId: upiId.trim(),
-      buyerNotes: (buyerNotes || '').trim(),
+      buyerNotes: cleanNotes,
       requestedAt: new Date(),
     };
     order.transferStage = 'refund_requested';
@@ -452,10 +464,12 @@ export const requestRefund = async (req, res) => {
     order.transferTimeline.push({
       stage: 'refund_requested',
       title: 'Refund Requested by Buyer',
-      description: `Refund claim submitted: "${reason}". Receiving UPI ID: ${upiId}. Modern Teams support is reviewing the claim.`,
+      description: `Refund claim submitted: "${reason}". Receiving UPI ID: ${upiId.trim()}. Modern Teams support is reviewing the claim.`,
       timestamp: new Date(),
     });
 
+    order.markModified('refund');
+    order.markModified('transferTimeline');
     await order.save();
 
     res.json({
@@ -514,6 +528,8 @@ export const updateRefundStatus = async (req, res) => {
       });
     }
 
+    order.markModified('refund');
+    order.markModified('transferTimeline');
     await order.save();
 
     res.json({

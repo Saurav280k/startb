@@ -57,6 +57,10 @@ const accountSchema = new mongoose.Schema({
     type: Number,
     default: 2,
   },
+  featuredOnHome: {
+    type: Boolean,
+    default: false,
+  },
   audienceStats: {
     topCountries: [String],
     genderDistribution: String,
