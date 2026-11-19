@@ -7,8 +7,8 @@ const serviceSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Development', 'Growth', 'SEO', 'Design', 'Cloud & DevOps'],
     required: true,
+    trim: true,
   },
   tag: {
     type: String,
