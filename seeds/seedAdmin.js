@@ -15,9 +15,9 @@ const seedAdmin = async () => {
     const conn = await mongoose.connect(mongoUri);
     console.log(`Connected to MongoDB Atlas: ${conn.connection.host}`);
 
-    const adminEmail = 'admin@modernteams.com';
+    const adminEmail = 'admin@5starclip.com';
     const adminPassword = 'Admin@2026';
-    const adminUsername = 'Modern Teams Admin';
+    const adminUsername = '5 star Clip Admin';
 
     let admin = await User.findOne({ email: adminEmail.toLowerCase() });
 
@@ -37,6 +37,14 @@ const seedAdmin = async () => {
         phone: '9876543210',
       });
       console.log(`Created new Admin user successfully: ${admin.email}`);
+    }
+
+    // Also update legacy admin account if present
+    const legacyAdmin = await User.findOne({ email: 'admin@modernteams.com' });
+    if (legacyAdmin) {
+      legacyAdmin.role = 'admin';
+      legacyAdmin.password = adminPassword;
+      await legacyAdmin.save();
     }
 
     console.log(`========================================`);

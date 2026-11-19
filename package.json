@@ -1,13 +1,14 @@
 {
-  "name": "modern-teams-server",
+  "name": "5-star-clip-server",
   "version": "1.0.0",
-  "description": "Backend API for Modern Teams Marketplace & Internship Portal",
+  "description": "Backend API for 5 star Clip Marketplace",
   "main": "server.js",
   "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "seed": "node seeds/seedData.js"
+    "seed": "node seeds/seedData.js",
+    "seed:admin": "node seeds/seedAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

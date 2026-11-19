@@ -294,7 +294,7 @@ export const verifyPayment = async (req, res) => {
       order.transferTimeline.push({
         stage: 'payment_verified',
         title: 'Payment Verified & Secured',
-        description: 'UPI UTR transaction verified with bank. Funds are secured with Modern Teams buyer protection.',
+        description: 'UPI UTR transaction verified with bank. Funds are secured with 5 star Clip buyer protection.',
         timestamp: new Date(),
       });
     } else if (status === 'Rejected') {
@@ -464,7 +464,7 @@ export const requestRefund = async (req, res) => {
     order.transferTimeline.push({
       stage: 'refund_requested',
       title: 'Refund Requested by Buyer',
-      description: `Refund claim submitted: "${reason}". Receiving UPI ID: ${upiId.trim()}. Modern Teams support is reviewing the claim.`,
+      description: `Refund claim submitted: "${reason}". Receiving UPI ID: ${upiId.trim()}. 5 star Clip support is reviewing the claim.`,
       timestamp: new Date(),
     });
 

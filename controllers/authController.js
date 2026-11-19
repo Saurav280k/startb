@@ -173,14 +173,24 @@ export const googleAuth = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Google credential token is required' });
     }
 
-    // Verify token using Google's tokeninfo endpoint
+    // Verify token using Google's tokeninfo or userinfo endpoint
     let payload;
     try {
+      // 1. First attempt: verify as OpenID Connect ID token
       const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
-      if (!googleRes.ok) {
-        return res.status(401).json({ success: false, message: 'Invalid or expired Google authentication token' });
+      if (googleRes.ok) {
+        payload = await googleRes.json();
+      } else {
+        // 2. Second attempt: verify as OAuth2 access token
+        const userinfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${credential}` },
+        });
+        if (userinfoRes.ok) {
+          payload = await userinfoRes.json();
+        } else {
+          return res.status(401).json({ success: false, message: 'Invalid or expired Google authentication token' });
+        }
       }
-      payload = await googleRes.json();
     } catch (fetchErr) {
       return res.status(500).json({ success: false, message: 'Failed to verify token with Google servers: ' + fetchErr.message });
     }
